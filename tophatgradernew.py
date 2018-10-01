@@ -1,6 +1,7 @@
 import pandas as pd
 import sys
 import re
+import os
 
 students = pd.read_csv('Students.csv')
 currweek = sys.argv[1]
@@ -306,25 +307,28 @@ students_final = pd.read_csv('Students.csv')
 
 avg_list = []
 adjusted_avg_list = []
-weeks_list = ['week1', 'week2', 'week3', 'week4']
+weeks_list = []
+weeks_text_list = []
 
-week1_average = pd.read_csv('week1-average.csv')
-week2_average = pd.read_csv('week2-average.csv')
-week3_average = pd.read_csv('week3-average.csv')
-#week4_average = pd.read_csv('../week4-average.csv')
+#detect the weeks via regex
+p = re.compile('^week\d{1,2}-average.csv$')
+for filename in os.listdir('.'):
+    if p.match(filename):
+        weeks_text_list.append(filename)
+        weeks_list.append(pd.read_csv(filename))
 
-week1_average.set_index("SIS User ID", inplace = True)
-week2_average.set_index("SIS User ID", inplace = True)
-week3_average.set_index("SIS User ID", inplace = True)
-#week4_average.set_index("SIS User ID", inplace = True)
+for item in weeks_list:
+    item.set_index("SIS User ID", inplace = True)
 
-def average_calculation(week1, week2, week3, email, avg_list, adjusted_avg_list):
+def average_calculation(weeks, weeks_text, email, avg_list, adjusted_avg_list):
     try:
-        w1 = week1.loc[email]['week1-average']
-        w2 = week2.loc[email]['week2-average']
-        w3 = week3.loc[email]['week3-average']
-        #w4 = week4.loc[email]['week4-average']
-        avg = (w1 + w2 + w3)/3
+        count = 0
+        running_avg = 0.0
+        for i in range(len(weeks_text)):
+            running_avg += weeks[i].loc[email][weeks_text[i][:-4]]
+            count += 1
+
+        avg = running_avg/count
         avg_list.append(avg)
         if avg > 80:
             adjusted_avg_list.append(100)
@@ -338,7 +342,7 @@ def average_calculation(week1, week2, week3, email, avg_list, adjusted_avg_list)
 
 count = 0
 for i, email in enumerate(students_final['SIS User ID']):
-    average_calculation(week1_average, week2_average, week3_average, str(email), avg_list, adjusted_avg_list)
+    average_calculation(weeks_list, weeks_text_list, str(email), avg_list, adjusted_avg_list)
     count+=1
 
 series_avg_list = pd.Series(avg_list)
