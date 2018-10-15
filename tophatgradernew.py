@@ -1,3 +1,33 @@
+
+#-------------------------------------------------------------------------------
+# tophatgradernew.py
+# A TopHat grading script for CS200 at UW-Madison
+# Adapted from a script by Varun Ramesh
+#
+# @author Jack Truskowski
+
+
+# The script is a bit messy and lacking documentation, sorry
+#
+# USAGE:
+# 1) Download student data for the week and save in the required format.
+#     ie) week1/week1-sec1-tue.xls
+# 2) From inside the 'week' directory, run convert.sh to convert data to .csv
+# 3) Download the most recent student data from Canvas as 'Students.csv'
+# 4) Run 'python tophatgradernew.py week1' (or the current week)
+#     The weekXX-average.csv file must exist for all previous weeks, so
+#     run the script in the order week1 -> week2 -> week3 -> week4, etc.
+#     Once you're caught up, you don't need to run the previous weeks again.
+# 5) Verify through the output of the program that the script correctly detected
+#     any days where there were no TopHat questions and that missing students
+#     are no longer in the class. Download missing files / rerun the script
+#     if necessary.
+# 6) The weekly data is stored in weekXX-average.csv and the combined data is
+#    stored in overall_averages.csv
+# 7) Visually inspect and upload overall_averages.csv to Canvas
+#
+#-------------------------------------------------------------------------------
+
 import pandas as pd
 import sys
 import re
@@ -7,8 +37,12 @@ students = pd.read_csv('Students.csv')
 currweek = sys.argv[1]
 print("Week", currweek)
 
-#see if there are any missing days
+
 ignore_list = []
+
+# The script currently auto-detects missing days. If you would like to manually enter missing days
+# the following lines may help:
+#
 # print("Are there any missing days this week?\n\tFormat as 'secX-DAY'\nType 'end' to finish")
 # while(True):
 #     usr_input = input()
@@ -18,6 +52,7 @@ ignore_list = []
 # print(ignore_list)
 
 
+#searches for csv files matching a pattern and adds missing files to the ignore list
 def getFileWithIgnoreListChecking(filename):
     try:
         return pd.read_csv(currweek + '/' + currweek + '-' + filename + '.csv')
@@ -38,6 +73,7 @@ currweek_sec4_fri = getFileWithIgnoreListChecking('sec4-fri')
 
 print("Couldn't find files for the following sections. Confirm that there were no TopHat questions for these sections this week:")
 
+#Detect missing files. Pls put us in a method.
 if isinstance(currweek_sec1_tue, pd.DataFrame):
     currweek_sec1_tue['Username'] = currweek_sec1_tue['Username'].str.upper()
     currweek_sec1_tue['Email Address'] = currweek_sec1_tue['Email Address'].str.upper()
@@ -108,7 +144,7 @@ if isinstance(currweek_sec4_fri, pd.DataFrame):
 else:
     print("sec4_fri")
 
-
+#Grabs the score for a student 
 def find_participation_score(df, email, studentList):
     try:
         studentList.append(df.loc[email]['Average %'])
@@ -138,6 +174,8 @@ for i, email in enumerate(students['SIS Login ID']):
     email = str(email)
     
     foundScore = False
+
+    #Search for scores for valid days
     if isinstance(currweek_sec1_tue, pd.DataFrame):
         result = find_participation_score(currweek_sec1_tue, email, scores_currweek_sec1_tue)
         if result:
@@ -179,9 +217,11 @@ for i, email in enumerate(students['SIS Login ID']):
         if result:
             foundScore = True
     if not foundScore:
+        #This student has no TopHat scores, something went wrong, maybe they're not in the class
+        #or this is not a row containing student data
         print("Couldn't find scores for student", email)
-    
-    
+
+#Do some calculations to give credit to students who may have attended a different lecture
 def calc_max(dayList, list1, list2):
     for score1, score2 in list(zip(list1, list2)):
         max_score = max(score1, score2)
@@ -204,7 +244,7 @@ for day1 in [max_mon, max_tue, max_wed, max_thu, max_fri]:
             for x in range(len(day2)):
                 day1.append(0)
 
-
+#Computes the average score for the week. The boolean flags represent whether there were TopHat questions on that day
 def calc_average(avg_list, max_mon, max_tue, max_wed, max_thu, max_fri, monflag, tueflag, wedflag, thuflag, friflag):
     for mon, tue, wed, thu, fri in list(zip(max_mon, max_tue, max_wed, max_thu, max_fri)):
 
