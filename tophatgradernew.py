@@ -347,6 +347,7 @@ students_final = pd.read_csv('Students.csv')
 
 avg_list = []
 adjusted_avg_list = []
+adjusted_avg_score_list = []
 weeks_list = []
 weeks_text_list = []
 
@@ -360,7 +361,7 @@ for filename in os.listdir('.'):
 for item in weeks_list:
     item.set_index("SIS User ID", inplace = True)
 
-def average_calculation(weeks, weeks_text, email, avg_list, adjusted_avg_list):
+def average_calculation(weeks, weeks_text, email, avg_list, adjusted_avg_list, adjusted_avg_score_list):
     try:
         count = 0
         running_avg = 0.0
@@ -372,25 +373,30 @@ def average_calculation(weeks, weeks_text, email, avg_list, adjusted_avg_list):
         avg_list.append(avg)
         if avg > 80:
             adjusted_avg_list.append(100)
+            adjusted_avg_score_list.append(5)
         else:
             adjusted_avg_list.append(avg)
+            adjusted_avg_score_list.append((avg*5)/100)
     except KeyError:
         print("ERROR: Couldn't find student with email: " + email)
         avg_list.append(0)
         adjusted_avg_list.append(0)
+        adjusted_avg_score_list.append(0)
         pass
 
 count = 0
 for i, email in enumerate(students_final['SIS User ID']):
-    average_calculation(weeks_list, weeks_text_list, str(email), avg_list, adjusted_avg_list)
+    average_calculation(weeks_list, weeks_text_list, str(email), avg_list, adjusted_avg_list, adjusted_avg_score_list)
     count+=1
 
 series_avg_list = pd.Series(avg_list)
 series_adjusted_avg_list = pd.Series(adjusted_avg_list)
+series_adjusted_avg_score_list = pd.Series(adjusted_avg_score_list)    
 
     
 students_final['TopHat Raw Score (377375)'] = series_avg_list.values
 students_final['TopHat Participation Current Score'] = series_adjusted_avg_list.values
+students_final['TopHat Participation Points (377372)'] = series_adjusted_avg_score_list.values
 #students_final['adjusted-averages'] = series_adjusted_avg_list.values
 
 students_final.to_csv('overall_averages.csv', index = False)
