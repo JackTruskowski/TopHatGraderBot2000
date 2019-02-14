@@ -33,10 +33,157 @@ import sys
 import re
 import os
 
+#if the students emails don't match for some reason
+aliases = {"JPJAWORSKI2@WISC.EDU": ["JAWORSKI@CS.WISC.EDU"],
+           "JAJOHNSON44@WISC.EDU": ["JACK.JOHNSON@WISC.EDU"],
+           "SKWON37@WISC.EDU": ["CKIM246@WISC.EDU"],
+           "TMLARSON2@WISC.EDU": ["THOMAS.LARSON@WISC.EDU"]}
+
+#--------------------------------------------------
+#METHODS
+#--------------------------------------------------
+
+#searches for csv files matching a pattern and adds missing files to the ignore list
+def getFileWithIgnoreListChecking(filename):
+    try:
+        return pd.read_csv(currweek + '/' + currweek + '-' + filename + '.csv')
+    except:
+        ignore_list.append(filename)
+        return None
+    
+#Detect missing files 
+def initAndDetectMissingFiles(currweek_var, df, missing_message):
+    if isinstance(currweek_var, df):
+        currweek_var['Username'] = currweek_var['Username'].str.upper()
+        currweek_var['Email Address'] = currweek_var['Email Address'].str.upper()
+        currweek_var.set_index("Email Address", inplace = True)
+    else:
+        print(missing_message)
+
+#Grabs the score for a student 
+def find_participation_score(df, email, studentList):
+
+    global aliases
+    
+    try:
+        studentList.append(df.loc[email]['Average %'])
+        return True
+    except KeyError:
+        pass
+
+    #If initial email fails, try aliases
+    if email in aliases:
+        for possibleAlias in aliases[email]:
+            try:
+                studentList.append(df.loc[possibleAlias]['Average %'])
+                return True
+            except KeyError:
+                pass
+
+    studentList.append(0)
+    return False;
+    
+#Do some calculations to give credit to students who may have attended a different lecture
+def calc_max(dayList, list1, list2):
+    for score1, score2 in list(zip(list1, list2)):
+        max_score = max(score1, score2)
+        dayList.append(max_score)
+        
+#Computes the average score for the week. The boolean flags represent whether there were TopHat questions on that day
+def calc_average(avg_list, max_mon, max_tue, max_wed, max_thu, max_fri, monflag, tueflag, wedflag, thuflag, friflag):
+    for mon, tue, wed, thu, fri in list(zip(max_mon, max_tue, max_wed, max_thu, max_fri)):
+
+        divisor = 3
+        if not monflag:
+            divisor -= 1
+        if not wedflag:
+            divisor -= 1
+        if not friflag:
+            divisor -= 1
+
+        if divisor > 0:
+            avg_1 = (mon + wed + fri)/divisor
+        else:
+            avg_1 = 0
+
+        divisor = 2
+        if not tueflag:
+            divisor -= 1
+        if not thuflag:
+            divisor -= 1
+
+        if divisor > 0:
+            avg_2 = (tue + thu)/divisor
+        else:
+            avg_2 = 0
+
+        divisor = 3
+        if not monflag:
+            divisor -= 1
+        if not wedflag:
+            divisor -= 1
+        if not thuflag:
+            divisor -= 1
+
+        if divisor > 0:
+            avg_3 = (mon + wed + thu)/divisor
+        else:
+            avg_3 = 0
+
+        divisor = 3
+        if not tueflag:
+            divisor -= 1
+        if not wedflag:
+            divisor -= 1
+        if not friflag:
+            divisor -= 1
+        if divisor > 0:
+            avg_4 = (tue + wed + fri)/divisor
+        else:
+            avg_4 = 0
+
+        best_avg = max(avg_1, avg_2, avg_3, avg_4)
+        
+        avg_list.append(best_avg)
+
+def average_calculation(weeks, weeks_text, email, avg_list, adjusted_avg_list, adjusted_avg_score_list):
+    try:
+        count = 0
+        week3_count = 0
+        running_avg = 0.0
+        running_avg_week3 = 0.0 #average from week 3 on
+        for i in range(len(weeks_text)):
+            if not "week1" in weeks_text and not "week2" in weeks_text and not "week3" in weeks_text:
+                running_avg_week3 += weeks[i].loc[email][weeks_text[i][:-4]]
+                week3_count += 1
+            running_avg += weeks[i].loc[email][weeks_text[i][:-4]]
+            count += 1
+
+        if week3_count > 0:
+            avg = max(running_avg/count, running_avg_week3/week3_count)
+        else:
+            avg = running_avg/count
+        avg_list.append(avg)
+        if avg > 80:
+            adjusted_avg_list.append(100)
+            adjusted_avg_score_list.append(5)
+        else:
+            adjusted_avg_list.append(avg)
+            adjusted_avg_score_list.append((avg*5)/100)
+    except KeyError:
+        print("ERROR: Couldn't find student with email: " + email)
+        avg_list.append(0)
+        adjusted_avg_list.append(0)
+        adjusted_avg_score_list.append(0)
+        pass
+
+    
+#--------------------------------------------------
+#CODE
+#--------------------------------------------------
+
 students = pd.read_csv('Students.csv')
 currweek = sys.argv[1]
-print("Week", currweek)
-
 
 ignore_list = []
 
@@ -51,15 +198,6 @@ ignore_list = []
 #     ignore_list.append(usr_input.lower())
 # print(ignore_list)
 
-
-#searches for csv files matching a pattern and adds missing files to the ignore list
-def getFileWithIgnoreListChecking(filename):
-    try:
-        return pd.read_csv(currweek + '/' + currweek + '-' + filename + '.csv')
-    except:
-        ignore_list.append(filename)
-        return None
-
 currweek_sec1_tue = getFileWithIgnoreListChecking('sec1-tue')
 currweek_sec1_thu = getFileWithIgnoreListChecking('sec1-thu')
 currweek_sec2_tue = getFileWithIgnoreListChecking('sec2-tue')
@@ -72,86 +210,16 @@ currweek_sec4_wed = getFileWithIgnoreListChecking('sec4-wed')
 currweek_sec4_fri = getFileWithIgnoreListChecking('sec4-fri')
 
 print("Couldn't find files for the following sections. Confirm that there were no TopHat questions for these sections this week:")
-
-#Detect missing files. Pls put us in a method.
-if isinstance(currweek_sec1_tue, pd.DataFrame):
-    currweek_sec1_tue['Username'] = currweek_sec1_tue['Username'].str.upper()
-    currweek_sec1_tue['Email Address'] = currweek_sec1_tue['Email Address'].str.upper()
-    currweek_sec1_tue.set_index("Email Address", inplace = True)
-else:
-    print("sec1_tue")
-    
-if isinstance(currweek_sec1_thu, pd.DataFrame):
-    currweek_sec1_thu['Username'] = currweek_sec1_thu['Username'].str.upper()
-    currweek_sec1_thu['Email Address'] = currweek_sec1_thu['Email Address'].str.upper()
-    currweek_sec1_thu.set_index("Email Address", inplace = True)
-else:
-    print("sec1_thu")
-    
-if isinstance(currweek_sec2_tue, pd.DataFrame):
-    currweek_sec2_tue['Username'] = currweek_sec2_tue['Username'].str.upper()
-    currweek_sec2_tue['Email Address'] = currweek_sec2_tue['Email Address'].str.upper()
-    currweek_sec2_tue.set_index("Email Address", inplace = True)
-else:
-    print("sec2_tue")
-
-if isinstance(currweek_sec2_thu, pd.DataFrame):
-    currweek_sec2_thu['Username'] = currweek_sec2_thu['Username'].str.upper()
-    currweek_sec2_thu['Email Address'] = currweek_sec2_thu['Email Address'].str.upper()
-    currweek_sec2_thu.set_index("Email Address", inplace = True)
-else:
-    print("sec2_thu")
-
-if isinstance(currweek_sec3_mon, pd.DataFrame):
-    currweek_sec3_mon['Username'] = currweek_sec3_mon['Username'].str.upper()
-    currweek_sec3_mon['Email Address'] = currweek_sec3_mon['Email Address'].str.upper()
-    currweek_sec3_mon.set_index("Email Address", inplace = True)
-else:
-    print("sec3_mon")
-    
-if isinstance(currweek_sec3_wed, pd.DataFrame):
-    currweek_sec3_wed['Username'] = currweek_sec3_wed['Username'].str.upper()
-    currweek_sec3_wed['Email Address'] = currweek_sec3_wed['Email Address'].str.upper()
-    currweek_sec3_wed.set_index("Email Address", inplace = True)
-else:
-    print("sec3_wed")
-
-if isinstance(currweek_sec3_fri, pd.DataFrame):
-    currweek_sec3_fri['Username'] = currweek_sec3_fri['Username'].str.upper()
-    currweek_sec3_fri['Email Address'] = currweek_sec3_fri['Email Address'].str.upper()
-    currweek_sec3_fri.set_index("Email Address", inplace = True)
-else:
-    print("sec3_fri")
-    
-if isinstance(currweek_sec4_mon, pd.DataFrame):
-    currweek_sec4_mon['Username'] = currweek_sec4_mon['Username'].str.upper()
-    currweek_sec4_mon['Email Address'] = currweek_sec4_mon['Email Address'].str.upper()
-    currweek_sec4_mon.set_index("Email Address", inplace = True)
-else:
-    print("sec4_mon")
-
-if isinstance(currweek_sec4_wed, pd.DataFrame):
-    currweek_sec4_wed['Username'] = currweek_sec4_wed['Username'].str.upper()
-    currweek_sec4_wed['Email Address'] = currweek_sec4_wed['Email Address'].str.upper()
-    currweek_sec4_wed.set_index("Email Address", inplace = True)
-else:
-    print("sec4_wed")
-
-if isinstance(currweek_sec4_fri, pd.DataFrame):
-    currweek_sec4_fri['Username'] = currweek_sec4_fri['Username'].str.upper()
-    currweek_sec4_fri['Email Address'] = currweek_sec4_fri['Email Address'].str.upper()
-    currweek_sec4_fri.set_index("Email Address", inplace = True)
-else:
-    print("sec4_fri")
-
-#Grabs the score for a student 
-def find_participation_score(df, email, studentList):
-    try:
-        studentList.append(df.loc[email]['Average %'])
-        return True
-    except KeyError:
-        studentList.append(0)
-        return False
+initAndDetectMissingFiles(currweek_sec1_tue, pd.DataFrame, "sec1_tue")
+initAndDetectMissingFiles(currweek_sec1_thu, pd.DataFrame, "sec1_thu")
+initAndDetectMissingFiles(currweek_sec2_tue, pd.DataFrame, "sec2_tue")
+initAndDetectMissingFiles(currweek_sec2_thu, pd.DataFrame, "sec2_thu")
+initAndDetectMissingFiles(currweek_sec3_mon, pd.DataFrame, "sec3_mon")
+initAndDetectMissingFiles(currweek_sec3_wed, pd.DataFrame, "sec3_wed")
+initAndDetectMissingFiles(currweek_sec3_fri, pd.DataFrame, "sec3_fri")
+initAndDetectMissingFiles(currweek_sec4_mon, pd.DataFrame, "sec4_mon")
+initAndDetectMissingFiles(currweek_sec4_wed, pd.DataFrame, "sec4_wed")
+initAndDetectMissingFiles(currweek_sec4_fri, pd.DataFrame, "sec4_fri")
 
 scores_currweek_sec1_tue = []
 scores_currweek_sec1_thu = []
@@ -219,13 +287,8 @@ for i, email in enumerate(students['SIS Login ID']):
     if not foundScore:
         #This student has no TopHat scores, something went wrong, maybe they're not in the class
         #or this is not a row containing student data
-        print("Couldn't find scores for student", email)
+        print("WARNING: Couldn't find scores for student: " + email)
 
-#Do some calculations to give credit to students who may have attended a different lecture
-def calc_max(dayList, list1, list2):
-    for score1, score2 in list(zip(list1, list2)):
-        max_score = max(score1, score2)
-        dayList.append(max_score)
 
 calc_max(max_mon, scores_currweek_sec3_mon, scores_currweek_sec4_mon)
 calc_max(max_tue, scores_currweek_sec1_tue, scores_currweek_sec2_tue)
@@ -244,62 +307,7 @@ for day1 in [max_mon, max_tue, max_wed, max_thu, max_fri]:
             for x in range(len(day2)):
                 day1.append(0)
 
-#Computes the average score for the week. The boolean flags represent whether there were TopHat questions on that day
-def calc_average(avg_list, max_mon, max_tue, max_wed, max_thu, max_fri, monflag, tueflag, wedflag, thuflag, friflag):
-    for mon, tue, wed, thu, fri in list(zip(max_mon, max_tue, max_wed, max_thu, max_fri)):
-
-        divisor = 3
-        if not monflag:
-            divisor -= 1
-        if not wedflag:
-            divisor -= 1
-        if not friflag:
-            divisor -= 1
-
-        if divisor > 0:
-            avg_1 = (mon + wed + fri)/divisor
-        else:
-            avg_1 = 0
-
-        divisor = 2
-        if not tueflag:
-            divisor -= 1
-        if not thuflag:
-            divisor -= 1
-
-        if divisor > 0:
-            avg_2 = (tue + thu)/divisor
-        else:
-            avg_2 = 0
-
-        divisor = 3
-        if not monflag:
-            divisor -= 1
-        if not wedflag:
-            divisor -= 1
-        if not thuflag:
-            divisor -= 1
-
-        if divisor > 0:
-            avg_3 = (mon + wed + thu)/divisor
-        else:
-            avg_3 = 0
-
-        divisor = 3
-        if not tueflag:
-            divisor -= 1
-        if not wedflag:
-            divisor -= 1
-        if not friflag:
-            divisor -= 1
-        if divisor > 0:
-            avg_4 = (tue + wed + fri)/divisor
-        else:
-            avg_4 = 0
-
-        best_avg = max(avg_1, avg_2, avg_3, avg_4)
-        avg_list.append(best_avg)
-
+                
 calc_average(currweek_average, max_mon, max_tue, max_wed, max_thu, max_fri, monflag, tueflag, wedflag, thuflag, friflag)
 
 series_currweek_sec1_tue = pd.Series(scores_currweek_sec1_tue)
@@ -334,15 +342,10 @@ if 'sec4-wed' not in ignore_list:
     students[currweek + '-sec4-wed'] = series_currweek_sec4_wed.values
 if 'sec4-fri' not in ignore_list:
     students[currweek + '-sec4-fri'] = series_currweek_sec4_fri.values
+
 students[currweek + '-average'] = series_currweek_average
-
 students.to_csv('./' + currweek + '-average.csv',index = False)
-
 students_final = pd.read_csv('Students.csv')
-
-
-#TODO
-#exit(0)
 
 
 avg_list = []
@@ -361,29 +364,7 @@ for filename in os.listdir('.'):
 for item in weeks_list:
     item.set_index("SIS User ID", inplace = True)
 
-def average_calculation(weeks, weeks_text, email, avg_list, adjusted_avg_list, adjusted_avg_score_list):
-    try:
-        count = 0
-        running_avg = 0.0
-        for i in range(len(weeks_text)):
-            running_avg += weeks[i].loc[email][weeks_text[i][:-4]]
-            count += 1
-
-        avg = running_avg/count
-        avg_list.append(avg)
-        if avg > 80:
-            adjusted_avg_list.append(100)
-            adjusted_avg_score_list.append(5)
-        else:
-            adjusted_avg_list.append(avg)
-            adjusted_avg_score_list.append((avg*5)/100)
-    except KeyError:
-        print("ERROR: Couldn't find student with email: " + email)
-        avg_list.append(0)
-        adjusted_avg_list.append(0)
-        adjusted_avg_score_list.append(0)
-        pass
-
+    
 count = 0
 for i, email in enumerate(students_final['SIS User ID']):
     average_calculation(weeks_list, weeks_text_list, str(email), avg_list, adjusted_avg_list, adjusted_avg_score_list)
@@ -392,11 +373,13 @@ for i, email in enumerate(students_final['SIS User ID']):
 series_avg_list = pd.Series(avg_list)
 series_adjusted_avg_list = pd.Series(adjusted_avg_list)
 series_adjusted_avg_score_list = pd.Series(adjusted_avg_score_list)    
-
     
-students_final['TopHat Raw Score (377375)'] = series_avg_list.values
+students_final['TopHat Raw Score (477865)'] = series_avg_list.values
 students_final['TopHat Participation Current Score'] = series_adjusted_avg_list.values
-students_final['TopHat Participation Points (377372)'] = series_adjusted_avg_score_list.values
+students_final['TopHat Participation Points (477864)'] = series_adjusted_avg_score_list.values
 #students_final['adjusted-averages'] = series_adjusted_avg_list.values
 
 students_final.to_csv('overall_averages.csv', index = False)
+
+
+
