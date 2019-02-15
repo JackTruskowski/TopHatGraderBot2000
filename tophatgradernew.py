@@ -29,6 +29,7 @@
 #-------------------------------------------------------------------------------
 
 import pandas as pd
+import csv
 import sys
 import re
 import os
@@ -42,6 +43,23 @@ aliases = {"JPJAWORSKI2@WISC.EDU": ["JAWORSKI@CS.WISC.EDU"],
 #--------------------------------------------------
 #METHODS
 #--------------------------------------------------
+
+def createDebugCSV(student_data, week_names, outfilename):
+    colnames = []
+    colnames.append("Name")
+    for week in week_names:
+        colnames.append(week)
+    colnames.append("Final Average")
+    student_data.insert(0, colnames)
+
+    # print(colnames)
+    # print((student_data[1]))
+        
+    with open(outfilename, 'w') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerows(student_data)
+    csvfile.close()
+    
 
 #searches for csv files matching a pattern and adds missing files to the ignore list
 def getFileWithIgnoreListChecking(filename):
@@ -146,16 +164,18 @@ def calc_average(avg_list, max_mon, max_tue, max_wed, max_thu, max_fri, monflag,
         
         avg_list.append(best_avg)
 
-def average_calculation(weeks, weeks_text, email, avg_list, adjusted_avg_list, adjusted_avg_score_list):
+def average_calculation(weeks, weeks_text, email, avg_list, adjusted_avg_list, adjusted_avg_score_list, student_averages):
     try:
         count = 0
         week3_count = 0
         running_avg = 0.0
         running_avg_week3 = 0.0 #average from week 3 on
         for i in range(len(weeks_text)):
-            if not "week1" in weeks_text and not "week2" in weeks_text and not "week3" in weeks_text:
+            if not "week1" in weeks_text[i] and not "week2" in weeks_text[i] and not "week3" in weeks_text[i]:
                 running_avg_week3 += weeks[i].loc[email][weeks_text[i][:-4]]
                 week3_count += 1
+
+            student_averages.append(weeks[i].loc[email][weeks_text[i][:-4]])
             running_avg += weeks[i].loc[email][weeks_text[i][:-4]]
             count += 1
 
@@ -164,11 +184,14 @@ def average_calculation(weeks, weeks_text, email, avg_list, adjusted_avg_list, a
         else:
             avg = running_avg/count
         avg_list.append(avg)
+        
         if avg > 80:
             adjusted_avg_list.append(100)
+            student_averages.append(avg)
             adjusted_avg_score_list.append(5)
         else:
             adjusted_avg_list.append(avg)
+            student_averages.append(avg)
             adjusted_avg_score_list.append((avg*5)/100)
     except KeyError:
         print("ERROR: Couldn't find student with email: " + email)
@@ -353,6 +376,7 @@ adjusted_avg_list = []
 adjusted_avg_score_list = []
 weeks_list = []
 weeks_text_list = []
+student_averages_for_debug = []
 
 #detect the weeks via regex
 p = re.compile('^week\d{1,2}-average.csv$')
@@ -367,8 +391,13 @@ for item in weeks_list:
     
 count = 0
 for i, email in enumerate(students_final['SIS User ID']):
-    average_calculation(weeks_list, weeks_text_list, str(email), avg_list, adjusted_avg_list, adjusted_avg_score_list)
+    student_average = []
+    student_average.append(students_final['SIS Login ID'][i])
+    average_calculation(weeks_list, weeks_text_list, str(email), avg_list, adjusted_avg_list, adjusted_avg_score_list, student_average)
+    student_averages_for_debug.append(student_average)
     count+=1
+
+createDebugCSV(student_averages_for_debug, weeks_text_list, "debug.csv")
 
 series_avg_list = pd.Series(avg_list)
 series_adjusted_avg_list = pd.Series(adjusted_avg_list)
@@ -380,6 +409,3 @@ students_final['TopHat Participation Points (477864)'] = series_adjusted_avg_sco
 #students_final['adjusted-averages'] = series_adjusted_avg_list.values
 
 students_final.to_csv('overall_averages.csv', index = False)
-
-
-
