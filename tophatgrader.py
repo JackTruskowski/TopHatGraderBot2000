@@ -1,13 +1,11 @@
 
 #-------------------------------------------------------------------------------
-# tophatgradernew.py
+# tophatgrader.py
 # A TopHat grading script for CS200 at UW-Madison
-# Adapted from a script by Varun Ramesh
+#     Adapted from a script by Varun Ramesh
 #
 # @author Jack Truskowski
-
-
-# The script is a bit messy and lacking documentation, sorry
+#--------------------------------------------------------------------------------
 #
 # USAGE:
 # 1) Download student data for the week and save in the required format.
@@ -29,10 +27,14 @@
 #-------------------------------------------------------------------------------
 
 import pandas as pd
+import numpy
 import csv
 import sys
 import re
 import os
+
+#-------------------------------------------------------------------------------
+# Modify these variables for your class
 
 #if the students emails don't match for some reason
 aliases = {"JPJAWORSKI2@WISC.EDU": ["JAWORSKI@CS.WISC.EDU"],
@@ -40,21 +42,30 @@ aliases = {"JPJAWORSKI2@WISC.EDU": ["JAWORSKI@CS.WISC.EDU"],
            "SKWON37@WISC.EDU": ["CKIM246@WISC.EDU"],
            "TMLARSON2@WISC.EDU": ["THOMAS.LARSON@WISC.EDU"]}
 
-#--------------------------------------------------
-#METHODS
-#--------------------------------------------------
+#contains the section information
+#For example,
+class_list = ['sec1-tue', 'sec1-thu', 'sec2-tue', 'sec2-thu', 'sec3-mon', \
+              'sec3-wed', 'sec3-fri', 'sec4-mon', 'sec4-wed', 'sec4-fri']
 
+#-------------------------------------------------------------------------------
+
+
+#-------------------------------------------------------------------------------
+# Methods
+
+
+# Creates a debug file that shows each weekly average and the final grade
+# for each student
 def createDebugCSV(student_data, week_names, outfilename):
     colnames = []
+
+    #collect the names of all columns and prepend them
     colnames.append("Name")
     for week in week_names:
         colnames.append(week)
     colnames.append("Final Average")
     student_data.insert(0, colnames)
-
-    # print(colnames)
-    # print((student_data[1]))
-        
+    
     with open(outfilename, 'w') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerows(student_data)
@@ -64,7 +75,7 @@ def createDebugCSV(student_data, week_names, outfilename):
 #searches for csv files matching a pattern and adds missing files to the ignore list
 def getFileWithIgnoreListChecking(filename):
     try:
-        return pd.read_csv(currweek + '/' + currweek + '-' + filename + '.csv')
+        return pd.read_csv('data/' + currweek + '/' + currweek + '-' + filename + '.csv')
     except:
         ignore_list.append(filename)
         return None
@@ -78,11 +89,11 @@ def initAndDetectMissingFiles(currweek_var, df, missing_message):
     else:
         print(missing_message)
 
-#Grabs the score for a student 
-def find_participation_score(df, email, studentList):
+#Given an email address, tries to find their score and add it to studentList
+def found_participation_score(df, email, studentList):
 
     global aliases
-    
+   
     try:
         studentList.append(df.loc[email]['Average %'])
         return True
@@ -164,6 +175,7 @@ def calc_average(avg_list, max_mon, max_tue, max_wed, max_thu, max_fri, monflag,
         
         avg_list.append(best_avg)
 
+#TODO: comment
 def average_calculation(weeks, weeks_text, email, avg_list, adjusted_avg_list, adjusted_avg_score_list, student_averages):
     try:
         count = 0
@@ -200,19 +212,26 @@ def average_calculation(weeks, weeks_text, email, avg_list, adjusted_avg_list, a
         adjusted_avg_score_list.append(0)
         pass
 
-    
-#--------------------------------------------------
-#CODE
-#--------------------------------------------------
+
+#--------------------------------------------------------------------------------    
+# MAIN
 
 students = pd.read_csv('Students.csv')
 currweek = sys.argv[1]
 
+#contains the week files <name, fileobject>
+week_files = {}
+#contains the score files <name, fileobject>
+score_files = {}
+#stores the pandas series
+grade_series = {}
+
+
 ignore_list = []
 
-# The script currently auto-detects missing days. If you would like to manually enter missing days
-# the following lines may help:
-#
+# The script currently auto-detects missing days. If you would like to manually
+# enter missing days the following lines may help:
+
 # print("Are there any missing days this week?\n\tFormat as 'secX-DAY'\nType 'end' to finish")
 # while(True):
 #     usr_input = input()
@@ -221,103 +240,62 @@ ignore_list = []
 #     ignore_list.append(usr_input.lower())
 # print(ignore_list)
 
-currweek_sec1_tue = getFileWithIgnoreListChecking('sec1-tue')
-currweek_sec1_thu = getFileWithIgnoreListChecking('sec1-thu')
-currweek_sec2_tue = getFileWithIgnoreListChecking('sec2-tue')
-currweek_sec2_thu = getFileWithIgnoreListChecking('sec2-thu')
-currweek_sec3_mon = getFileWithIgnoreListChecking('sec3-mon')
-currweek_sec3_wed = getFileWithIgnoreListChecking('sec3-wed')
-currweek_sec3_fri = getFileWithIgnoreListChecking('sec3-fri')
-currweek_sec4_mon = getFileWithIgnoreListChecking('sec4-mon')
-currweek_sec4_wed = getFileWithIgnoreListChecking('sec4-wed')
-currweek_sec4_fri = getFileWithIgnoreListChecking('sec4-fri')
+for curr_section in class_list:
+    week_files[curr_section] = getFileWithIgnoreListChecking(curr_section)
+    score_files[curr_section] = []
+    grade_series[curr_section] = None
 
-print("Couldn't find files for the following sections. Confirm that there were no TopHat questions for these sections this week:")
-initAndDetectMissingFiles(currweek_sec1_tue, pd.DataFrame, "sec1_tue")
-initAndDetectMissingFiles(currweek_sec1_thu, pd.DataFrame, "sec1_thu")
-initAndDetectMissingFiles(currweek_sec2_tue, pd.DataFrame, "sec2_tue")
-initAndDetectMissingFiles(currweek_sec2_thu, pd.DataFrame, "sec2_thu")
-initAndDetectMissingFiles(currweek_sec3_mon, pd.DataFrame, "sec3_mon")
-initAndDetectMissingFiles(currweek_sec3_wed, pd.DataFrame, "sec3_wed")
-initAndDetectMissingFiles(currweek_sec3_fri, pd.DataFrame, "sec3_fri")
-initAndDetectMissingFiles(currweek_sec4_mon, pd.DataFrame, "sec4_mon")
-initAndDetectMissingFiles(currweek_sec4_wed, pd.DataFrame, "sec4_wed")
-initAndDetectMissingFiles(currweek_sec4_fri, pd.DataFrame, "sec4_fri")
+print("Couldn't find files for the following sections. Confirm that there were \
+no TopHat questions for these sections this week:")
 
-scores_currweek_sec1_tue = []
-scores_currweek_sec1_thu = []
-scores_currweek_sec2_tue = []
-scores_currweek_sec2_thu = []
-scores_currweek_sec3_mon = []
-scores_currweek_sec3_wed = []
-scores_currweek_sec3_fri = []
-scores_currweek_sec4_mon = []
-scores_currweek_sec4_wed = []
-scores_currweek_sec4_fri = []
+for name_text, week_file_obj in week_files.iteritems():
+    initAndDetectMissingFiles(week_file_obj, pd.DataFrame, name_text)
+
+# scores_currweek_sec1_tue = []
+# scores_currweek_sec1_thu = []
+# scores_currweek_sec2_tue = []
+# scores_currweek_sec2_thu = []
+# scores_currweek_sec3_mon = []
+# scores_currweek_sec3_wed = []
+# scores_currweek_sec3_fri = []
+# scores_currweek_sec4_mon = []
+# scores_currweek_sec4_wed = []
+# scores_currweek_sec4_fri = []
+
+currweek_average = []
+
+for i, email in enumerate(students['SIS Login ID']):
+
+    email = str(email)
+    if not isinstance(email, basestring) and numpy.isnan(email):
+        continue
+    
+    foundScore = False
+
+    #Search for scores for valid days
+    for name_text, week_file_obj in week_files.iteritems():
+        if isinstance(week_file_obj, pd.DataFrame):
+            if found_participation_score(week_file_obj, email, score_files[name_text]):
+                foundScore = True
+
+    if not foundScore:
+        #This student has no TopHat scores, something went wrong, maybe they're
+        #not in the class or this is not a row containing student data
+        print("WARNING: Couldn't find scores for student: " + email)
+
+
 max_mon = []
 max_tue = []
 max_wed = []
 max_thu = []
 max_fri = []
-currweek_average = []
 
-for i, email in enumerate(students['SIS Login ID']):
-    email = str(email)
-    
-    foundScore = False
-
-    #Search for scores for valid days
-    if isinstance(currweek_sec1_tue, pd.DataFrame):
-        result = find_participation_score(currweek_sec1_tue, email, scores_currweek_sec1_tue)
-        if result:
-            foundScore = True
-    if isinstance(currweek_sec1_thu, pd.DataFrame):
-        result = find_participation_score(currweek_sec1_thu, email, scores_currweek_sec1_thu)
-        if result:
-            foundScore = True
-    if isinstance(currweek_sec2_tue, pd.DataFrame):
-        result = find_participation_score(currweek_sec2_tue, email, scores_currweek_sec2_tue)
-        if result:
-            foundScore = True
-    if isinstance(currweek_sec2_thu, pd.DataFrame):
-        result = find_participation_score(currweek_sec2_thu, email, scores_currweek_sec2_thu)
-        if result:
-            foundScore = True
-    if isinstance(currweek_sec3_mon, pd.DataFrame):
-        result = find_participation_score(currweek_sec3_mon, email, scores_currweek_sec3_mon)
-        if result:
-            foundScore = True
-    if isinstance(currweek_sec3_wed, pd.DataFrame):
-        result = find_participation_score(currweek_sec3_wed, email, scores_currweek_sec3_wed)
-        if result:
-            foundScore = True
-    if isinstance(currweek_sec3_fri, pd.DataFrame):
-        result = find_participation_score(currweek_sec3_fri, email, scores_currweek_sec3_fri)
-        if result:
-            foundScore = True
-    if isinstance(currweek_sec4_mon, pd.DataFrame):
-        result = find_participation_score(currweek_sec4_mon, email, scores_currweek_sec4_mon)
-        if result:
-            foundScore = True
-    if isinstance(currweek_sec4_wed, pd.DataFrame):
-        result = find_participation_score(currweek_sec4_wed, email, scores_currweek_sec4_wed)
-        if result:
-            foundScore = True
-    if isinstance(currweek_sec4_fri, pd.DataFrame):
-        result = find_participation_score(currweek_sec4_fri, email, scores_currweek_sec4_fri)
-        if result:
-            foundScore = True
-    if not foundScore:
-        #This student has no TopHat scores, something went wrong, maybe they're not in the class
-        #or this is not a row containing student data
-        print("WARNING: Couldn't find scores for student: " + email)
-
-
-calc_max(max_mon, scores_currweek_sec3_mon, scores_currweek_sec4_mon)
-calc_max(max_tue, scores_currweek_sec1_tue, scores_currweek_sec2_tue)
-calc_max(max_wed, scores_currweek_sec3_wed, scores_currweek_sec4_wed)
-calc_max(max_thu, scores_currweek_sec1_thu, scores_currweek_sec2_thu)
-calc_max(max_fri, scores_currweek_sec3_fri, scores_currweek_sec4_fri)
+#TODO: for giving points to students who attended a different lecture. You can add/remove
+calc_max(max_mon, score_files["sec3-mon"], score_files["sec4-mon"])
+calc_max(max_tue, score_files["sec1-tue"], score_files["sec2-tue"])
+calc_max(max_wed, score_files["sec3-wed"], score_files["sec4-wed"])
+calc_max(max_thu, score_files["sec1-thu"], score_files["sec2-thu"])
+calc_max(max_fri, score_files["sec3-fri"], score_files["sec4-fri"])
 
 monflag = len(max_mon)!=0
 tueflag = len(max_tue)!=0
@@ -333,41 +311,13 @@ for day1 in [max_mon, max_tue, max_wed, max_thu, max_fri]:
                 
 calc_average(currweek_average, max_mon, max_tue, max_wed, max_thu, max_fri, monflag, tueflag, wedflag, thuflag, friflag)
 
-series_currweek_sec1_tue = pd.Series(scores_currweek_sec1_tue)
-series_currweek_sec1_thu = pd.Series(scores_currweek_sec1_thu)
-series_currweek_sec2_tue = pd.Series(scores_currweek_sec2_tue)
-series_currweek_sec2_thu = pd.Series(scores_currweek_sec2_thu)
-series_currweek_sec3_mon = pd.Series(scores_currweek_sec3_mon)
-series_currweek_sec3_wed = pd.Series(scores_currweek_sec3_wed)
-series_currweek_sec3_fri = pd.Series(scores_currweek_sec3_fri)
-series_currweek_sec4_mon = pd.Series(scores_currweek_sec4_mon)
-series_currweek_sec4_wed = pd.Series(scores_currweek_sec4_wed)
-series_currweek_sec4_fri = pd.Series(scores_currweek_sec4_fri)
-series_currweek_average = pd.Series(currweek_average)
+for name_text, score_file in score_files.iteritems():
+    if name_text not in ignore_list:
+        students[currweek + '-' + name_text] = pd.Series(score_file).values
+currweek_average_series = pd.Series(currweek_average)
 
-if 'sec1-tue' not in ignore_list:
-    students[currweek + '-sec1-tue'] = series_currweek_sec1_tue.values
-if 'sec1-thu' not in ignore_list:
-    students[currweek + '-sec1-thu'] = series_currweek_sec1_thu.values
-if 'sec2-tue' not in ignore_list:
-    students[currweek + '-sec2-tue'] = series_currweek_sec2_tue.values
-if 'sec2-thu' not in ignore_list:
-    students[currweek + '-sec2-thu'] = series_currweek_sec2_thu.values
-if 'sec3-mon' not in ignore_list:
-    students[currweek + '-sec3-mon'] = series_currweek_sec3_mon.values
-if 'sec3-wed' not in ignore_list:
-    students[currweek + '-sec3-wed'] = series_currweek_sec3_wed.values
-if 'sec3-fri' not in ignore_list:
-    students[currweek + '-sec3-fri'] = series_currweek_sec3_fri.values
-if 'sec4-mon' not in ignore_list:
-    students[currweek + '-sec4-mon'] = series_currweek_sec4_mon.values
-if 'sec4-wed' not in ignore_list:
-    students[currweek + '-sec4-wed'] = series_currweek_sec4_wed.values
-if 'sec4-fri' not in ignore_list:
-    students[currweek + '-sec4-fri'] = series_currweek_sec4_fri.values
-
-students[currweek + '-average'] = series_currweek_average
-students.to_csv('./' + currweek + '-average.csv',index = False)
+students[currweek + '-average'] = currweek_average_series
+students.to_csv('./intermediate/' + currweek + '-average.csv',index = False)
 students_final = pd.read_csv('Students.csv')
 
 
@@ -380,10 +330,10 @@ student_averages_for_debug = []
 
 #detect the weeks via regex
 p = re.compile('^week\d{1,2}-average.csv$')
-for filename in os.listdir('.'):
+for filename in os.listdir('./intermediate'):
     if p.match(filename):
         weeks_text_list.append(filename)
-        weeks_list.append(pd.read_csv(filename))
+        weeks_list.append(pd.read_csv('./intermediate/' + filename))
 
 for item in weeks_list:
     item.set_index("SIS User ID", inplace = True)
@@ -397,7 +347,7 @@ for i, email in enumerate(students_final['SIS User ID']):
     student_averages_for_debug.append(student_average)
     count+=1
 
-createDebugCSV(student_averages_for_debug, weeks_text_list, "debug.csv")
+createDebugCSV(student_averages_for_debug, weeks_text_list, "./intermediate/debug.csv")
 
 series_avg_list = pd.Series(avg_list)
 series_adjusted_avg_list = pd.Series(adjusted_avg_list)
