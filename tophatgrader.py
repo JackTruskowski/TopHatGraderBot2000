@@ -183,7 +183,7 @@ def average_calculation(weeks, weeks_text, email, avg_list, adjusted_avg_list, a
         running_avg = 0.0
         running_avg_week3 = 0.0 #average from week 3 on
         for i in range(len(weeks_text)):
-            if not "week1" in weeks_text[i] and not "week2" in weeks_text[i] and not "week3" in weeks_text[i]:
+            if not "week1" in weeks_text[i] and not "week2" in weeks_text[i]:
                 running_avg_week3 += weeks[i].loc[email][weeks_text[i][:-4]]
                 week3_count += 1
 
