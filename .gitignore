@@ -1,3 +1,4 @@
-*.csv
-*.xls
+data/week*/*.csv
+data/week*/*.xls
+data/week*/xlsfiles/*.xls
 *#
