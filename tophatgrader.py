@@ -102,9 +102,9 @@ def foundParticipationScore(df, email, studentList, name_text):
     if email in override_dict:
         for override_tup in override_dict[email]:
             if override_tup[0] == currweek + '-' + name_text:
-                print("LOG: Found an override score for student " + email + \
-                      "\n\tClass: " + currweek + '-' + name_text + \
-                      "\n\tNew Score: " + str(override_tup[1]))
+                print("LOG:\t\tFound an override score for student " + email + \
+                      "\n\t\t\tClass: " + currweek + '-' + name_text + \
+                      "\n\t\t\tNew Score: " + str(override_tup[1]))
                 studentList.append(override_tup[1])
                 return True
     #test aliases for overrides too
@@ -113,9 +113,9 @@ def foundParticipationScore(df, email, studentList, name_text):
             if possible_alias in override_dict:
                 for override_tup in override_dict[possible_alias]:
                     if override_tup[0] == currweek + '-' + name_text:
-                        print("LOG: Found an override score for student " + email + \
-                              "\tClass: " + currweek + '-' + name_text + \
-                              "\tNew Score: " + str(override_tup[1]))
+                        print("LOG:\t\tFound an override score for student " + email + \
+                              "\t\t\tClass: " + currweek + '-' + name_text + \
+                              "\t\t\tNew Score: " + str(override_tup[1]))
                         studentList.append(override_tup[1])
                         return True
         
@@ -139,10 +139,13 @@ def foundParticipationScore(df, email, studentList, name_text):
     return False;
     
 #Do some calculations to give credit to students who may have attended a different lecture
-def calc_max(dayList, list1, list2):
+#TODO: unsure if this actually works, because TopHat doesn't seem to track it
+def getMaxScoreFromSections(list1, list2):
+    max_list = []
     for score1, score2 in list(zip(list1, list2)):
         max_score = max(score1, score2)
-        dayList.append(max_score)
+        max_list.append(max_score)
+    return max_list
         
 #Computes the average score for the week. The boolean flags represent whether there were TopHat questions on that day
 def calc_average(avg_list, max_mon, max_tue, max_wed, max_thu, max_fri, monflag, tueflag, wedflag, thuflag, friflag):
@@ -202,7 +205,8 @@ def calc_average(avg_list, max_mon, max_tue, max_wed, max_thu, max_fri, monflag,
         avg_list.append(best_avg)
 
 #TODO: comment
-def average_calculation(weeks, weeks_text, email, avg_list, adjusted_avg_list, adjusted_avg_score_list, student_averages):
+def averageCalculation(weeks, weeks_text, email, avg_list, adjusted_avg_list, adjusted_avg_score_list, student_averages):
+
     try:
         count = 0
         week3_count = 0
@@ -232,7 +236,8 @@ def average_calculation(weeks, weeks_text, email, avg_list, adjusted_avg_list, a
             student_averages.append(avg)
             adjusted_avg_score_list.append((avg*5)/100)
     except KeyError:
-        print("WARNING: Couldn't find student with email: " + email)
+        if isinstance(email, basestring) and email != "nan":
+            print("WARNING:\tCouldn't find student with email: " + email)
         avg_list.append(0)
         adjusted_avg_list.append(0)
         adjusted_avg_score_list.append(0)
@@ -295,35 +300,31 @@ for i, email in enumerate(students['SIS Login ID']):
     if not foundScore:
         #This student has no TopHat scores, something went wrong, maybe they're
         #not in the class or this is not a row containing student data
-        print("WARNING: Couldn't find scores for student: " + email)
+        if isinstance(email, basestring) and email != "nan":
+            print("WARNING:\tCouldn't find scores for student: " + email)
 
-
-max_mon = []
-max_tue = []
-max_wed = []
-max_thu = []
-max_fri = []
 
 #TODO: for giving points to students who attended a different lecture. You can add/remove
-calc_max(max_mon, score_files["sec3-mon"], score_files["sec4-mon"])
-calc_max(max_tue, score_files["sec1-tue"], score_files["sec2-tue"])
-calc_max(max_wed, score_files["sec3-wed"], score_files["sec4-wed"])
-calc_max(max_thu, score_files["sec1-thu"], score_files["sec2-thu"])
-calc_max(max_fri, score_files["sec3-fri"], score_files["sec4-fri"])
+max_mon_list = getMaxScoreFromSections(score_files["sec3-mon"], score_files["sec4-mon"])
+max_tue_list = getMaxScoreFromSections(score_files["sec1-tue"], score_files["sec2-tue"])
+max_wed_list = getMaxScoreFromSections(score_files["sec3-wed"], score_files["sec4-wed"])
+max_thu_list = getMaxScoreFromSections(score_files["sec1-thu"], score_files["sec2-thu"])
+max_fri_list = getMaxScoreFromSections(score_files["sec3-fri"], score_files["sec4-fri"])
 
-monflag = len(max_mon)!=0
-tueflag = len(max_tue)!=0
-wedflag = len(max_wed)!=0
-thuflag = len(max_thu)!=0
-friflag = len(max_fri)!=0
-for day1 in [max_mon, max_tue, max_wed, max_thu, max_fri]:
-    for day2 in [max_mon, max_tue, max_wed, max_thu, max_fri]:
+monflag = len(max_mon_list)!=0
+tueflag = len(max_tue_list)!=0
+wedflag = len(max_wed_list)!=0
+thuflag = len(max_thu_list)!=0
+friflag = len(max_fri_list)!=0
+for day1 in [max_mon_list, max_tue_list, max_wed_list, max_thu_list, max_fri_list]:
+    for day2 in [max_mon_list, max_tue_list, max_wed_list, max_thu_list, max_fri_list]:
         if not day1 and day2:
             for x in range(len(day2)):
                 day1.append(0)
 
                 
-calc_average(currweek_average, max_mon, max_tue, max_wed, max_thu, max_fri, monflag, tueflag, wedflag, thuflag, friflag)
+calc_average(currweek_average, max_mon_list, max_tue_list, max_wed_list, max_thu_list, \
+             max_fri_list, monflag, tueflag, wedflag, thuflag, friflag)
 
 for name_text, score_file in score_files.iteritems():
     if name_text not in ignore_list:
@@ -357,19 +358,19 @@ count = 0
 for i, email in enumerate(students_final['SIS User ID']):
     student_average = []
     student_average.append(students_final['SIS Login ID'][i])
-    average_calculation(weeks_list, weeks_text_list, str(email), avg_list, adjusted_avg_list, adjusted_avg_score_list, student_average)
+    averageCalculation(weeks_list, weeks_text_list, str(email), avg_list, adjusted_avg_list, adjusted_avg_score_list, student_average)
     student_averages_for_debug.append(student_average)
     count+=1
 
+#make a debug CSV for easy verification / looking up of scores
 createDebugCSV(student_averages_for_debug, weeks_text_list, "./intermediate/debug.csv")
 
 series_avg_list = pd.Series(avg_list)
 series_adjusted_avg_list = pd.Series(adjusted_avg_list)
 series_adjusted_avg_score_list = pd.Series(adjusted_avg_score_list)    
-    
+
+#create and write out the final file
 students_final['TopHat Raw Score (477865)'] = series_avg_list.values
 students_final['TopHat Participation Current Score'] = series_adjusted_avg_list.values
 students_final['TopHat Participation Points (477864)'] = series_adjusted_avg_score_list.values
-#students_final['adjusted-averages'] = series_adjusted_avg_list.values
-
 students_final.to_csv('overall_averages.csv', index = False)
