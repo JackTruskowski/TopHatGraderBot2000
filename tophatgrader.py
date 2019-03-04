@@ -42,6 +42,8 @@ aliases = {"JPJAWORSKI2@WISC.EDU": ["JAWORSKI@CS.WISC.EDU"],
            "SKWON37@WISC.EDU": ["CKIM246@WISC.EDU"],
            "TMLARSON2@WISC.EDU": ["THOMAS.LARSON@WISC.EDU"]}
 
+override_dict = {"EXAMPLE@WISC.EDU":[('week1-sec1-tue', 100)], "ELKORDI@WISC.EDU":[('week1-sec1-tue', 100), ('week4-sec1-tue', 100)]}
+
 #contains the section information
 #For example,
 class_list = ['sec1-tue', 'sec1-thu', 'sec2-tue', 'sec2-thu', 'sec3-mon', \
@@ -90,10 +92,34 @@ def initAndDetectMissingFiles(currweek_var, df, missing_message):
         print(missing_message)
 
 #Given an email address, tries to find their score and add it to studentList
-def found_participation_score(df, email, studentList):
+def foundParticipationScore(df, email, studentList, name_text):
 
     global aliases
-   
+    global override_dict
+    global currweek
+    
+    #try overrides first
+    if email in override_dict:
+        for override_tup in override_dict[email]:
+            if override_tup[0] == currweek + '-' + name_text:
+                print("LOG: Found an override score for student " + email + \
+                      "\n\tClass: " + currweek + '-' + name_text + \
+                      "\n\tNew Score: " + str(override_tup[1]))
+                studentList.append(override_tup[1])
+                return True
+    #test aliases for overrides too
+    if email in aliases:
+        for possible_alias in aliases[email]:
+            if possible_alias in override_dict:
+                for override_tup in override_dict[possible_alias]:
+                    if override_tup[0] == currweek + '-' + name_text:
+                        print("LOG: Found an override score for student " + email + \
+                              "\tClass: " + currweek + '-' + name_text + \
+                              "\tNew Score: " + str(override_tup[1]))
+                        studentList.append(override_tup[1])
+                        return True
+        
+    #if no override, do the normal searching
     try:
         studentList.append(df.loc[email]['Average %'])
         return True
@@ -102,9 +128,9 @@ def found_participation_score(df, email, studentList):
 
     #If initial email fails, try aliases
     if email in aliases:
-        for possibleAlias in aliases[email]:
+        for possible_alias in aliases[email]:
             try:
-                studentList.append(df.loc[possibleAlias]['Average %'])
+                studentList.append(df.loc[possible_alias]['Average %'])
                 return True
             except KeyError:
                 pass
@@ -206,11 +232,10 @@ def average_calculation(weeks, weeks_text, email, avg_list, adjusted_avg_list, a
             student_averages.append(avg)
             adjusted_avg_score_list.append((avg*5)/100)
     except KeyError:
-        print("ERROR: Couldn't find student with email: " + email)
+        print("WARNING: Couldn't find student with email: " + email)
         avg_list.append(0)
         adjusted_avg_list.append(0)
         adjusted_avg_score_list.append(0)
-        pass
 
 
 #--------------------------------------------------------------------------------    
@@ -251,17 +276,6 @@ no TopHat questions for these sections this week:")
 for name_text, week_file_obj in week_files.iteritems():
     initAndDetectMissingFiles(week_file_obj, pd.DataFrame, name_text)
 
-# scores_currweek_sec1_tue = []
-# scores_currweek_sec1_thu = []
-# scores_currweek_sec2_tue = []
-# scores_currweek_sec2_thu = []
-# scores_currweek_sec3_mon = []
-# scores_currweek_sec3_wed = []
-# scores_currweek_sec3_fri = []
-# scores_currweek_sec4_mon = []
-# scores_currweek_sec4_wed = []
-# scores_currweek_sec4_fri = []
-
 currweek_average = []
 
 for i, email in enumerate(students['SIS Login ID']):
@@ -275,7 +289,7 @@ for i, email in enumerate(students['SIS Login ID']):
     #Search for scores for valid days
     for name_text, week_file_obj in week_files.iteritems():
         if isinstance(week_file_obj, pd.DataFrame):
-            if found_participation_score(week_file_obj, email, score_files[name_text]):
+            if foundParticipationScore(week_file_obj, email, score_files[name_text], name_text):
                 foundScore = True
 
     if not foundScore:
