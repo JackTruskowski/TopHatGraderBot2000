@@ -7,22 +7,7 @@
 # @author Jack Truskowski
 #--------------------------------------------------------------------------------
 #
-# USAGE:
-# 1) Download student data for the week and save in the required format.
-#     ie) week1/week1-sec1-tue.xls
-# 2) From inside the 'week' directory, run convert.sh to convert data to .csv
-# 3) Download the most recent student data from Canvas as 'Students.csv'
-# 4) Run 'python tophatgradernew.py week1' (or the current week)
-#     The weekXX-average.csv file must exist for all previous weeks, so
-#     run the script in the order week1 -> week2 -> week3 -> week4, etc.
-#     Once you're caught up, you don't need to run the previous weeks again.
-# 5) Verify through the output of the program that the script correctly detected
-#     any days where there were no TopHat questions and that missing students
-#     are no longer in the class. Download missing files / rerun the script
-#     if necessary.
-# 6) The weekly data is stored in weekXX-average.csv and the combined data is
-#    stored in overall_averages.csv
-# 7) Visually inspect and upload overall_averages.csv to Canvas
+# For usage information, refer to README.md
 #
 #-------------------------------------------------------------------------------
 
@@ -42,6 +27,7 @@ aliases = {"JPJAWORSKI2@WISC.EDU": ["JAWORSKI@CS.WISC.EDU"],
            "SKWON37@WISC.EDU": ["CKIM246@WISC.EDU"],
            "TMLARSON2@WISC.EDU": ["THOMAS.LARSON@WISC.EDU"]}
 
+#for overriding the grades downloaded from TopHat
 override_dict = {"EXAMPLE@WISC.EDU":[('week1-sec1-tue', 100)], "ELKORDI@WISC.EDU":[('week1-sec1-tue', 100), ('week4-sec1-tue', 100)]}
 
 #contains the section information
@@ -83,13 +69,14 @@ def getFileWithIgnoreListChecking(filename):
         return None
     
 #Detect missing files 
-def initAndDetectMissingFiles(currweek_var, df, missing_message):
+def initAndDetectMissingFiles(currweek_var, df):
     if isinstance(currweek_var, df):
         currweek_var['Username'] = currweek_var['Username'].str.upper()
         currweek_var['Email Address'] = currweek_var['Email Address'].str.upper()
         currweek_var.set_index("Email Address", inplace = True)
+        return True
     else:
-        print(missing_message)
+        return False
 
 #Given an email address, tries to find their score and add it to studentList
 def foundParticipationScore(df, email, studentList, name_text):
@@ -148,7 +135,7 @@ def getMaxScoreFromSections(list1, list2):
     return max_list
         
 #Computes the average score for the week. The boolean flags represent whether there were TopHat questions on that day
-def calc_average(avg_list, max_mon, max_tue, max_wed, max_thu, max_fri, monflag, tueflag, wedflag, thuflag, friflag):
+def calcAverage(avg_list, max_mon, max_tue, max_wed, max_thu, max_fri, monflag, tueflag, wedflag, thuflag, friflag):
     for mon, tue, wed, thu, fri in list(zip(max_mon, max_tue, max_wed, max_thu, max_fri)):
 
         divisor = 3
@@ -247,7 +234,8 @@ def averageCalculation(weeks, weeks_text, email, avg_list, adjusted_avg_list, ad
 # MAIN
 
 students = pd.read_csv('Students.csv')
-currweek = sys.argv[1]
+currweek = sys.argv[1][7:] #chop off the filepath
+print("\n" + currweek)
 
 #contains the week files <name, fileobject>
 week_files = {}
@@ -255,7 +243,6 @@ week_files = {}
 score_files = {}
 #stores the pandas series
 grade_series = {}
-
 
 ignore_list = []
 
@@ -275,11 +262,16 @@ for curr_section in class_list:
     score_files[curr_section] = []
     grade_series[curr_section] = None
 
-print("Couldn't find files for the following sections. Confirm that there were \
-no TopHat questions for these sections this week:")
-
+missing_files = []
 for name_text, week_file_obj in week_files.iteritems():
-    initAndDetectMissingFiles(week_file_obj, pd.DataFrame, name_text)
+    fileExists = initAndDetectMissingFiles(week_file_obj, pd.DataFrame)
+    if not fileExists:
+        missing_files.append(name_text)
+        
+if len(missing_files) > 0:
+    print("Couldn't find files for the following sections. Confirm that there were no TopHat questions for these sections this week:")
+    for file_ in missing_files:
+        print("\t" + file_)
 
 currweek_average = []
 
@@ -323,7 +315,7 @@ for day1 in [max_mon_list, max_tue_list, max_wed_list, max_thu_list, max_fri_lis
                 day1.append(0)
 
                 
-calc_average(currweek_average, max_mon_list, max_tue_list, max_wed_list, max_thu_list, \
+calcAverage(currweek_average, max_mon_list, max_tue_list, max_wed_list, max_thu_list, \
              max_fri_list, monflag, tueflag, wedflag, thuflag, friflag)
 
 for name_text, score_file in score_files.iteritems():
